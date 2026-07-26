@@ -1,0 +1,54 @@
+app = "kittens"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # Bind dual-stack: Fly forwards raw TCP to this internal port.
+  KITTENS_BIND = "[::]:443"
+  # One app answers for all three names. tls.kittens.sh is kept as an alias so
+  # any existing links or docs referring to it keep working.
+  KITTENS_DOMAINS = "kittens.sh,www.kittens.sh,tls.kittens.sh"
+  KITTENS_STATIC_DIR = "/srv/site"
+  KITTENS_ACME_CACHE = "/data/acme"
+  KITTENS_LOG = "info"
+  # Flip to "1" only once staging has issued successfully — Let's Encrypt
+  # production allows just 5 duplicate certificates per week, and burning
+  # that quota costs days.
+  KITTENS_ACME_PROD = "0"
+
+# Certificates persist here. Without it every deploy re-issues and would hit
+# the rate limit above within a handful of pushes.
+[[mounts]]
+  source = "kittens_acme"
+  destination = "/data"
+
+[[services]]
+  internal_port = 443
+  protocol = "tcp"
+  # A volume pins this app to one machine, so never scale to zero: a cold
+  # start would also mean re-reading certs on the first visitor's request.
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[services.ports]]
+    port = 443
+    # THE critical line. An empty handler list means Fly passes raw TCP
+    # straight through. Adding "tls" here would make Fly terminate the
+    # handshake, and every visitor would fingerprint Fly's proxy instead of
+    # their own browser — which is the entire point of this service.
+    handlers = []
+
+  # TCP-connect only: an HTTP check can't traverse a raw TCP service, and
+  # anything deeper would need a TLS client here.
+  [[services.tcp_checks]]
+    interval = "15s"
+    timeout = "2s"
+    grace_period = "10s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  cpus = 1
