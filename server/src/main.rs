@@ -1,3 +1,5 @@
+mod http;
+mod stream;
 mod tls;
 
 fn main() {
