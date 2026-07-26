@@ -1,4 +1,5 @@
 mod http;
+mod http2;
 mod stream;
 mod tls;
 
