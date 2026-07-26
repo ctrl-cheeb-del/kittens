@@ -1,0 +1,548 @@
+/*
+  kittens — instrument panel.
+
+  The subject is ordered wire data, so the monospace face is the display face
+  rather than a code accent: a fingerprint like t13d1516h2_8daaf6152771_… is
+  only legible in fixed width, and pretending otherwise would fight the content.
+  Palette is oscilloscope rather than terminal — indigo ground, amber signal,
+  cyan structure — to stay clear of the green-on-black hacker cliché.
+*/
+
+:root {
+  --ink: #0f1524;
+  --panel: #161e33;
+  --panel-2: #1c2540;
+  --line: #2a3557;
+  --line-soft: #212b49;
+
+  --text: #e6eaf4;
+  --text-dim: #98a3c2;
+  --text-faint: #5a6785;
+
+  /* Amber is reserved for the fingerprint itself — the signal being acquired. */
+  --signal: #ffb454;
+  --signal-dim: #7a5624;
+  /* Cyan marks protocol structure: names, counts, labels. */
+  --struct: #5ccfe6;
+  --ok: #7fd88f;
+  --warn: #ff8f6b;
+
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --gutter: clamp(1rem, 4vw, 3rem);
+  --radius: 3px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--ink);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  /* Faint horizontal rule pattern: graph paper under the instrument. */
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0 39px,
+    rgba(255, 255, 255, 0.017) 39px 40px
+  );
+}
+
+a {
+  color: var(--struct);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+a:hover {
+  border-bottom-color: currentColor;
+}
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+.wrap {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 var(--gutter);
+}
+
+/* ---------- masthead ---------- */
+
+.masthead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.5rem 0 1.25rem;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.wordmark {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+.wordmark span {
+  color: var(--signal);
+}
+
+.masthead nav {
+  display: flex;
+  gap: 1.25rem;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+/* ---------- readout (the hero) ---------- */
+
+.readout {
+  padding: clamp(2.5rem, 7vw, 4.5rem) 0 clamp(2rem, 5vw, 3rem);
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 0 0 0.9rem;
+}
+
+.fingerprint {
+  font-family: var(--mono);
+  font-weight: 700;
+  /* A JA4 is a fixed 36 characters. Sized so that never wraps: breaking a
+     fingerprint across lines orphans a digit and makes it unreadable as the
+     single token it is. Below ~430px it scrolls rather than wraps. */
+  font-size: clamp(0.95rem, 4.35vw, 2.7rem);
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  color: var(--signal);
+  margin: 0;
+  white-space: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 0.15rem;
+}
+.fingerprint::-webkit-scrollbar {
+  display: none;
+}
+/* The two hashed halves sit back so the readable prefix leads. */
+.fingerprint .hashed {
+  color: var(--signal);
+  opacity: 0.62;
+}
+.fingerprint .sep {
+  color: var(--text-faint);
+}
+
+.verdict {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1.5rem;
+  font-size: 1.05rem;
+}
+.verdict strong {
+  font-weight: 600;
+}
+.confidence {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.1rem 0.45rem;
+}
+
+/* The mismatch banner is the one place the palette shouts. */
+.mismatch {
+  margin-top: 1.5rem;
+  border: 1px solid var(--warn);
+  border-left-width: 3px;
+  border-radius: var(--radius);
+  background: rgba(255, 143, 107, 0.07);
+  padding: 0.85rem 1rem;
+  font-size: 0.92rem;
+}
+.mismatch b {
+  color: var(--warn);
+}
+
+/* ---------- the tape (signature element) ---------- */
+
+.tape-block {
+  margin: 0 0 2rem;
+}
+
+.tape-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.tape-title {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+.tape-count {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--text-faint);
+}
+
+.tape {
+  display: flex;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  scrollbar-width: thin;
+}
+
+.cell {
+  flex: 0 0 auto;
+  min-width: 76px;
+  padding: 0.5rem 0.6rem 0.55rem;
+  border-right: 1px solid var(--line-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  position: relative;
+}
+.cell:last-child {
+  border-right: none;
+}
+
+.cell-index {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  color: var(--text-faint);
+  letter-spacing: 0.05em;
+}
+.cell-hex {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--struct);
+}
+.cell-name {
+  font-family: var(--sans);
+  font-size: 0.63rem;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+
+/* GREASE is struck through because that is literally what happens to it:
+   the value is on the wire but excluded from every hash. */
+.cell.grease {
+  background: repeating-linear-gradient(
+    45deg,
+    transparent 0 5px,
+    rgba(255, 255, 255, 0.028) 5px 10px
+  );
+}
+.cell.grease .cell-hex {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+
+/* ---------- panels ---------- */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.25rem;
+  padding-bottom: 3rem;
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  padding: 1.1rem 1.15rem 1.25rem;
+}
+
+.panel h2 {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 0 0 0.9rem;
+  font-weight: 500;
+}
+
+.rows {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(120px, 38%) 1fr;
+  gap: 0.75rem;
+  align-items: baseline;
+  font-size: 0.85rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--line-soft);
+}
+.row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.row dt {
+  color: var(--text-faint);
+  font-size: 0.78rem;
+}
+.row dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--text);
+  word-break: break-word;
+}
+.row dd.num {
+  color: var(--struct);
+}
+
+.hashline {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text);
+  word-break: break-all;
+  background: var(--ink);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.6rem;
+  margin-top: 0.15rem;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.chip {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.1rem 0.4rem;
+  color: var(--text-dim);
+}
+.chip.on {
+  border-color: var(--signal-dim);
+  color: var(--signal);
+}
+
+/* ---------- evidence list ---------- */
+
+.evidence {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+.evidence li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.6rem;
+  align-items: baseline;
+  font-size: 0.83rem;
+  color: var(--text-dim);
+}
+.evidence .implies {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--text-faint);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0 0.35rem;
+  white-space: nowrap;
+}
+
+/* ---------- raw json ---------- */
+
+details.raw {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel);
+  margin-bottom: 3rem;
+}
+details.raw summary {
+  cursor: pointer;
+  padding: 0.8rem 1rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  list-style: none;
+}
+details.raw summary::-webkit-details-marker {
+  display: none;
+}
+details.raw summary::before {
+  content: "▸ ";
+  color: var(--text-faint);
+}
+details.raw[open] summary::before {
+  content: "▾ ";
+}
+details.raw pre {
+  margin: 0;
+  padding: 0 1rem 1rem;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+/* ---------- states ---------- */
+
+.state {
+  padding: 4rem 0;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+.state.error {
+  color: var(--warn);
+}
+.state code {
+  color: var(--struct);
+}
+
+/* The readout "acquires" on load — an instrument locking onto a signal.
+   One orchestrated moment, not scattered effects. */
+@keyframes acquire {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.acquire {
+  animation: acquire 380ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+.acquire-2 {
+  animation-delay: 90ms;
+}
+.acquire-3 {
+  animation-delay: 180ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .acquire,
+  .acquire-2,
+  .acquire-3 {
+    animation: none;
+  }
+}
+
+/* ---------- footer ---------- */
+
+footer.site {
+  border-top: 1px solid var(--line);
+  padding: 1.5rem 0 3rem;
+  font-size: 0.8rem;
+  color: var(--text-faint);
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* ---------- docs ---------- */
+
+.doc {
+  padding: 2.5rem 0 4rem;
+  max-width: 720px;
+}
+.doc h1 {
+  font-family: var(--mono);
+  font-size: 1.6rem;
+  letter-spacing: -0.03em;
+  margin: 0 0 0.5rem;
+}
+.doc h2 {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  margin: 2.25rem 0 0.6rem;
+  color: var(--signal);
+}
+.doc p {
+  color: var(--text-dim);
+}
+.doc pre {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.8rem 1rem;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text);
+}
+.doc code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  color: var(--struct);
+}
+.doc pre code {
+  color: inherit;
+}
+.doc table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+.doc th,
+.doc td {
+  text-align: left;
+  padding: 0.45rem 0.5rem;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: top;
+}
+.doc th {
+  color: var(--text-faint);
+  font-weight: 500;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.doc td:first-child {
+  font-family: var(--mono);
+  color: var(--struct);
+  white-space: nowrap;
+}
