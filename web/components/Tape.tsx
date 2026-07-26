@@ -1,13 +1,10 @@
 /**
  * The tape: an ordered ribbon of protocol values.
  *
- * This is the page's argument. JA3, JA4 and the Akamai fingerprint are all
- * hashes over *sequences*, so the one thing the UI must make undeniable is
- * order — hence index numbers on every cell and horizontal scroll rather than
- * wrapping, which would imply the arrangement is cosmetic.
- *
- * GREASE cells are struck through because that is exactly their fate: present
- * on the wire, excluded from every hash.
+ * JA3, JA4 and the Akamai fingerprint are all hashes over *sequences*, so the
+ * one thing this UI has to make undeniable is order. Hence an index on every
+ * cell, and horizontal scroll rather than wrapping, which would imply the
+ * arrangement is cosmetic.
  */
 
 interface Cell {
@@ -31,26 +28,45 @@ export function Tape({
   const counted = cells.length - greased;
 
   return (
-    <section className="tape-block">
-      <div className="tape-head">
-        <span className="tape-title">{title}</span>
-        <span className="tape-count">
+    <section className="mb-6">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-3">
+        <h3 className="label">{title}</h3>
+        <span className="font-mono text-[11px] text-muted-foreground">
           {counted} hashed
-          {greased > 0 ? ` · ${greased} GREASE discarded` : ""}
+          {greased > 0 ? ` · ${greased} GREASE dropped` : ""}
           {note ? ` · ${note}` : ""}
         </span>
       </div>
-      <div className="tape" role="list" aria-label={title}>
+
+      <div
+        role="list"
+        aria-label={title}
+        className="no-scrollbar flex overflow-x-auto rounded-2xl border border-line bg-card"
+      >
         {cells.map((c, i) => (
           <div
             role="listitem"
-            className={c.grease ? "cell grease" : "cell"}
             key={`${c.hex}-${i}`}
-            title={c.grease ? `${c.hex} — GREASE, excluded from hashes` : `${c.hex} ${c.name}`}
+            title={
+              c.grease
+                ? `${c.hex} is GREASE, excluded from every hash`
+                : `${c.hex} ${c.name}`
+            }
+            className={`cell ${c.grease ? "cell-grease" : ""}`}
           >
-            <span className="cell-index">{String(i + 1).padStart(2, "0")}</span>
-            <span className="cell-hex">{c.hex}</span>
-            <span className="cell-name">{c.grease ? "GREASE" : c.name}</span>
+            <span className="font-mono text-[10px] text-muted-foreground">
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            <span
+              className={`font-mono text-[13px] ${
+                c.grease ? "text-muted-foreground line-through" : "text-canopy"
+              }`}
+            >
+              {c.hex}
+            </span>
+            <span className="max-w-[150px] truncate text-[11px] text-muted-foreground">
+              {c.grease ? "GREASE" : c.name}
+            </span>
           </div>
         ))}
       </div>
