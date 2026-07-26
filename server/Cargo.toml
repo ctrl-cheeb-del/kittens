@@ -1,0 +1,63 @@
+[package]
+name = "kittens"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.82"
+description = "TLS and HTTP fingerprinting server behind kittens.sh"
+license = "MIT"
+
+[dependencies]
+anyhow = "1.0"
+bytes = "1"
+hex = "0.4"
+httparse = "1.10"
+md-5 = "0.10"
+sha2 = "0.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = [
+    "rt-multi-thread",
+    "net",
+    "io-util",
+    "macros",
+    "time",
+    "signal",
+] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# HPACK decoding for HTTP/2 HEADERS frames. We need the decoded header list in
+# wire order (pseudo-header order is part of the Akamai fingerprint), which this
+# gives us as a Vec of pairs rather than a map.
+fluke-hpack = "0.3"
+
+# ring rather than the default aws-lc-rs: no cmake / C toolchain in the image.
+rustls = { version = "0.23", default-features = false, features = [
+    "ring",
+    "std",
+    "tls12",
+    "logging",
+] }
+tokio-rustls = { version = "0.26", default-features = false, features = [
+    "ring",
+    "tls12",
+    "logging",
+] }
+rustls-pemfile = "2"
+
+# Self-signed cert for local dev only.
+rcgen = "0.14"
+
+# Let's Encrypt via TLS-ALPN-01 in production.
+rustls-acme = { version = "0.15", default-features = false, features = [
+    "ring",
+    "tokio",
+    "tls12",
+    "webpki-roots",
+] }
+tokio-stream = "0.1.19"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+strip = true
