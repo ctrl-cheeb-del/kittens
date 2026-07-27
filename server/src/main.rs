@@ -10,6 +10,7 @@ mod http;
 mod http1;
 mod http2;
 mod model;
+mod proxy_protocol;
 mod ratelimit;
 mod static_files;
 mod stream;
@@ -53,6 +54,12 @@ struct Config {
     acme_production: bool,
     /// Directory of the exported site. Absent ⇒ API only.
     static_root: Option<PathBuf>,
+    /// Expect a PROXY protocol header on every connection.
+    ///
+    /// Only enable where the listener is unreachable except through a trusted
+    /// proxy: a client that can connect directly could otherwise name any
+    /// source address it likes and walk past the rate limiter.
+    proxy_protocol: bool,
 }
 
 impl Config {
@@ -81,6 +88,7 @@ impl Config {
             // iterating on a deploy is a multi-day mistake to undo.
             acme_production: std::env::var("KITTENS_ACME_PROD").as_deref() == Ok("1"),
             static_root: std::env::var("KITTENS_STATIC_DIR").ok().map(PathBuf::from),
+            proxy_protocol: std::env::var("KITTENS_PROXY_PROTOCOL").as_deref() == Ok("1"),
         }
     }
 }
@@ -97,6 +105,7 @@ struct Shared {
     tls: TlsConfigs,
     limiter: RateLimiter,
     site: StaticSite,
+    proxy_protocol: bool,
 }
 
 /// Apply the rate limit, then route. Liveness checks are exempt so a throttled
@@ -147,10 +156,15 @@ async fn main() -> Result<()> {
         info!("no static site found — serving the API only");
     }
 
+    if cfg.proxy_protocol {
+        info!("expecting a PROXY protocol header on every connection");
+    }
+
     let shared = Arc::new(Shared {
         tls: configs,
         limiter: RateLimiter::new(Limits::default()),
         site,
+        proxy_protocol: cfg.proxy_protocol,
     });
 
     let listener = TcpListener::bind(&cfg.bind)
@@ -187,9 +201,31 @@ async fn handle(mut tcp: TcpStream, peer: SocketAddr, shared: Arc<Shared>) -> Re
     // only thing a visitor notices.
     let _ = tcp.set_nodelay(true);
 
-    let (hello, raw) = tokio::time::timeout(HANDSHAKE_TIMEOUT, read_client_hello(&mut tcp))
+    // Anything already read past the PROXY header belongs to the handshake.
+    let mut carried = Vec::new();
+    let mut peer = peer;
+
+    if shared.proxy_protocol {
+        let header = tokio::time::timeout(
+            HANDSHAKE_TIMEOUT,
+            proxy_protocol::read(&mut tcp, &mut carried),
+        )
         .await
-        .context("timed out reading ClientHello")??;
+        .context("timed out reading PROXY header")??;
+
+        // LOCAL headers (the platform's own health checks) carry no client, so
+        // the socket address is the best we have.
+        if let Some(source) = header.source {
+            peer = source;
+        }
+    }
+
+    let (hello, raw) = tokio::time::timeout(
+        HANDSHAKE_TIMEOUT,
+        read_client_hello(&mut tcp, carried),
+    )
+    .await
+    .context("timed out reading ClientHello")??;
 
     // An ACME validation request is just a ClientHello advertising acme-tls/1;
     // we already parsed the ALPN list, so no second parse is needed.
@@ -267,17 +303,17 @@ async fn handle(mut tcp: TcpStream, peer: SocketAddr, shared: Arc<Shared>) -> Re
 
 /// Read from the socket until a complete ClientHello has arrived, returning it
 /// alongside the raw bytes so they can be replayed to rustls.
-async fn read_client_hello(tcp: &mut TcpStream) -> Result<(ClientHello, Vec<u8>)> {
-    let mut acc = Vec::with_capacity(4096);
+async fn read_client_hello(
+    tcp: &mut TcpStream,
+    carried: Vec<u8>,
+) -> Result<(ClientHello, Vec<u8>)> {
+    // Whatever arrived alongside the PROXY header is already handshake bytes,
+    // and may even be a complete hello, so parse before reading again.
+    let mut acc = carried;
+    acc.reserve(4096);
     let mut chunk = [0u8; 4096];
 
     loop {
-        let n = tcp.read(&mut chunk).await?;
-        if n == 0 {
-            bail!("connection closed before ClientHello completed");
-        }
-        acc.extend_from_slice(&chunk[..n]);
-
         match parse_from_records(&acc)? {
             ParseOutcome::Complete(hello) => return Ok((*hello, acc)),
             ParseOutcome::NeedMore => {
@@ -286,6 +322,12 @@ async fn read_client_hello(tcp: &mut TcpStream) -> Result<(ClientHello, Vec<u8>)
                 }
             }
         }
+
+        let n = tcp.read(&mut chunk).await?;
+        if n == 0 {
+            bail!("connection closed before ClientHello completed");
+        }
+        acc.extend_from_slice(&chunk[..n]);
     }
 }
 

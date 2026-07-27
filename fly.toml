@@ -15,6 +15,10 @@ primary_region = "lhr"
   KITTENS_STATIC_DIR = "/srv/site"
   KITTENS_ACME_CACHE = "/data/acme"
   KITTENS_LOG = "info"
+  # Fly's raw passthrough hides the client behind its internal proxy, which
+  # makes the reported IP wrong and collapses the per-IP rate limiter into one
+  # shared bucket. proxy_proto below restores the real source address.
+  KITTENS_PROXY_PROTOCOL = "1"
   # Flip to "1" only once staging has issued successfully — Let's Encrypt
   # production allows just 5 duplicate certificates per week, and burning
   # that quota costs days.
@@ -37,11 +41,12 @@ primary_region = "lhr"
 
   [[services.ports]]
     port = 443
-    # THE critical line. An empty handler list means Fly passes raw TCP
-    # straight through. Adding "tls" here would make Fly terminate the
-    # handshake, and every visitor would fingerprint Fly's proxy instead of
-    # their own browser — which is the entire point of this service.
-    handlers = []
+    # proxy_proto only prefixes a header naming the real client; the TLS bytes
+    # that follow are untouched, so the ClientHello still reaches us intact.
+    # Adding "tls" here would make Fly terminate the handshake instead, and
+    # every visitor would fingerprint Fly's proxy rather than their own
+    # browser — which is the entire point of this service.
+    handlers = ["proxy_proto"]
 
   # TCP-connect only: an HTTP check can't traverse a raw TCP service, and
   # anything deeper would need a TLS client here.
