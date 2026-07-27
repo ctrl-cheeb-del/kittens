@@ -15,8 +15,15 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/Button";
+import { Cat } from "@/components/Cat";
 import { Tape } from "@/components/Tape";
-import { classify, describeClient } from "@/lib/classify";
+import {
+  classify,
+  describeClient,
+  headline,
+  moodFor,
+  volunteered,
+} from "@/lib/classify";
 import type { Fingerprint } from "@/lib/types";
 
 const ORIGIN = process.env.NEXT_PUBLIC_ORIGIN_URL ?? "";
@@ -120,6 +127,8 @@ function ErrorState({ message }: { message: string }) {
 
 function Report({ fp }: { fp: Fingerprint }) {
   const verdict = classify(fp);
+  const mood = moodFor(verdict);
+  const leaked = volunteered(fp);
   const [a, b, c] = fp.ja4.split("_");
   const [copied, setCopied] = useState(false);
 
@@ -147,34 +156,65 @@ function Report({ fp }: { fp: Fingerprint }) {
           <span className="text-canopy">{c}</span>
         </h1>
 
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
-          <Button onClick={copy}>{copied ? "Copied" : "Copy fingerprint"}</Button>
-          <p className="text-base">
-            Looks like <strong className="font-semibold">{verdict.family}</strong>
-            {verdict.confidence > 0 && (
-              <span className="ml-2 rounded-full border border-line px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
-                {verdict.confidence}% match
-              </span>
-            )}
-            <span className="ml-2 text-muted-foreground">
-              claims {describeClient(fp)}
-            </span>
-          </p>
-        </div>
+        {/* The verdict, led by the cat. Terracotta is the brand's single focal
+            point, so it is spent only on the disagreement case. */}
+        <div
+          className={`flex flex-col gap-4 rounded-2xl border p-5 sm:flex-row sm:items-center ${
+            verdict.mismatch
+              ? "border-terracotta/40 bg-terracotta/[0.05]"
+              : "border-line bg-card"
+          }`}
+        >
+          <Cat
+            mood={mood}
+            className={`h-16 w-16 shrink-0 ${
+              verdict.mismatch
+                ? "text-terracotta"
+                : mood === "curious"
+                  ? "text-muted-foreground"
+                  : "text-canopy"
+            }`}
+          />
 
-        {/* Terracotta is the brand's single focal point, used sparingly. A
-            handshake that contradicts its own User-Agent earns it. */}
-        {verdict.mismatch && (
-          <div className="mt-6 rounded-2xl border border-terracotta/40 border-l-[3px] border-l-terracotta bg-terracotta/[0.06] px-4 py-3">
-            <p className="text-sm">
-              <strong className="font-semibold text-terracotta">
-                Handshake and User-Agent disagree.
-              </strong>{" "}
-              The User-Agent claims {verdict.uaFamily}, but the TLS handshake
-              looks like {verdict.family}. That&rsquo;s what an impersonation
-              library looks like before it matches its target.
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-xl font-bold leading-snug tracking-tight">
+              {headline(fp, verdict)}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {verdict.family !== "Unknown" && (
+                <>
+                  Handshake reads as{" "}
+                  <strong className="font-semibold text-ink">
+                    {verdict.family}
+                  </strong>{" "}
+                  <span className="font-mono text-[11px]">
+                    ({verdict.confidence}% of its tells)
+                  </span>
+                  {". "}
+                </>
+              )}
+              Claims to be{" "}
+              <strong className="font-semibold text-ink">
+                {describeClient(fp)}
+              </strong>
+              {". "}
+              It volunteered{" "}
+              <strong className="font-semibold text-ink">{leaked}</strong>{" "}
+              distinct values across its cipher, extension, group, signature and
+              SETTINGS lists. Any one of them can tell you apart.
             </p>
           </div>
+
+          <div className="shrink-0">
+            <Button onClick={copy}>{copied ? "Copied" : "Copy JA4"}</Button>
+          </div>
+        </div>
+
+        {verdict.mismatch && (
+          <p className="mt-3 text-sm text-muted-foreground">
+            That is what an impersonation library looks like before it matches
+            its target.
+          </p>
         )}
       </section>
 
@@ -212,10 +252,15 @@ function Report({ fp }: { fp: Fingerprint }) {
         <section className="panel">
           <h2 className="label mb-4">Fingerprints</h2>
           <dl className="space-y-0">
-            <Row label="JA4" value={fp.ja4} mono />
-            <Row label="JA3" value={fp.ja3_hash} mono />
+            <Row label="JA4" value={fp.ja4} mono copyable />
+            <Row label="JA3" value={fp.ja3_hash} mono copyable />
             {fp.http2 && (
-              <Row label="Akamai" value={fp.http2.akamai_fingerprint} mono />
+              <Row
+                label="Akamai"
+                value={fp.http2.akamai_fingerprint}
+                mono
+                copyable
+              />
             )}
           </dl>
           <p className="label mb-2 mt-5">JA4 before hashing</p>
@@ -358,25 +403,77 @@ function Report({ fp }: { fp: Fingerprint }) {
   );
 }
 
+/**
+ * Long values get their own line rather than being crushed into a 38% column.
+ * A JA4 or an Akamai string is 40+ unbroken characters; side-by-side it either
+ * overflows the card or wraps into a ragged two-character-wide ribbon.
+ */
+const STACK_ABOVE = 26;
+
 function Row({
   label,
   value,
   mono,
+  copyable,
 }: {
   label: string;
   value: string | null;
   mono?: boolean;
+  copyable?: boolean;
 }) {
   if (value === null) return null;
+  const stacked = value.length > STACK_ABOVE;
+
   return (
-    <div className="grid grid-cols-[minmax(96px,38%)_1fr] items-baseline gap-3 border-b border-line/60 py-1.5 last:border-b-0">
-      <dt className="text-[13px] text-muted-foreground">{label}</dt>
-      {/* break-all, not break-words: fingerprints and cipher names are single
-          unbroken tokens, so overflow-wrap has nothing to break on and they
-          run past the card edge. */}
-      <dd className={`text-[13px] ${mono ? "break-all font-mono" : "break-words"}`}>
-        {value}
+    <div
+      className={`border-b border-line/60 py-2 last:border-b-0 ${
+        stacked
+          ? ""
+          : "grid grid-cols-[minmax(88px,40%)_1fr] items-baseline gap-3"
+      }`}
+    >
+      <dt
+        className={`text-[13px] text-muted-foreground ${stacked ? "mb-1" : ""}`}
+      >
+        {label}
+      </dt>
+      <dd
+        className={`min-w-0 text-[13px] ${
+          mono ? "break-all font-mono" : "break-words"
+        }`}
+      >
+        {copyable ? <CopyValue value={value} /> : value}
       </dd>
     </div>
+  );
+}
+
+/** Click-to-copy, because every value in this panel is meant to be pasted. */
+function CopyValue({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        navigator.clipboard?.writeText(value).then(
+          () => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1400);
+          },
+          () => {},
+        );
+      }}
+      title="Copy"
+      className="group/c -mx-1 rounded px-1 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
+    >
+      <span className="break-all">{value}</span>
+      <span
+        className={`ml-1.5 align-middle text-[10px] ${
+          copied ? "text-canopy" : "text-muted-foreground opacity-0 group-hover/c:opacity-100"
+        }`}
+      >
+        {copied ? "copied" : "copy"}
+      </span>
+    </button>
   );
 }
