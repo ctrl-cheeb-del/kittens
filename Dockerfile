@@ -6,7 +6,10 @@ FROM node:22-slim AS web
 
 WORKDIR /web
 COPY web/package.json web/package-lock.json ./
-RUN npm ci
+# --include=dev explicitly: the site cannot build without tailwind, postcss and
+# typescript, and any base image or CI that sets NODE_ENV=production would have
+# npm skip them and fail the build here.
+RUN npm ci --include=dev
 COPY web/ ./
 # `output: "export"` in next.config.ts writes plain files to out/.
 RUN npm run build
