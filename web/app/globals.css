@@ -51,9 +51,12 @@
     @apply text-base text-muted-foreground max-w-[52ch] text-pretty;
   }
 
-  /* Surface for anything that holds data: white on cream, 16px radius. */
+  /* Surface for anything that holds data: white on cream, 16px radius.
+     Panels live in a CSS-columns flow rather than a grid, so they pack by
+     content instead of stretching to the tallest card in their row. That is
+     what was leaving half-empty cards under TLS and Connection. */
   .panel {
-    @apply rounded-2xl border border-line bg-card p-5;
+    @apply mb-5 break-inside-avoid rounded-2xl border border-line bg-card p-5;
   }
 
   /* One cell of the tape. Order is the whole argument of this page, so cells

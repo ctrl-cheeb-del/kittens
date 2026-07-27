@@ -11,6 +11,18 @@ export interface ExtensionInfo extends ProtocolValue {
   length: number;
 }
 
+export interface SpanInfo {
+  start: number;
+  end: number;
+  label: string;
+}
+
+export interface RawHello {
+  hex: string;
+  length: number;
+  spans: SpanInfo[];
+}
+
 export interface TlsInfo {
   negotiated_version: string | null;
   negotiated_cipher: string | null;
@@ -32,6 +44,7 @@ export interface TlsInfo {
   alpn: string[];
   application_settings: string[];
   record_size_limit: number | null;
+  raw: RawHello;
 }
 
 export interface SettingInfo {

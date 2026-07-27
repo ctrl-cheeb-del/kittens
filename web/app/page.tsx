@@ -16,6 +16,11 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/Button";
 import { Cat } from "@/components/Cat";
+import {
+  Report as ReportBody,
+  ViewPicker,
+  useView,
+} from "@/components/layouts";
 import { Tape } from "@/components/Tape";
 import {
   classify,
@@ -24,6 +29,7 @@ import {
   subline,
   volunteered,
 } from "@/lib/classify";
+import { buildSections } from "@/lib/sections";
 import type { Fingerprint } from "@/lib/types";
 
 const ORIGIN = process.env.NEXT_PUBLIC_ORIGIN_URL ?? "";
@@ -130,6 +136,8 @@ function Report({ fp }: { fp: Fingerprint }) {
   const mood = moodFor(verdict);
   const sub = subline(fp, verdict);
   const leaked = volunteered(fp);
+  const sections = buildSections(fp, verdict);
+  const [view, setView] = useView();
   const [a, b, c] = fp.ja4.split("_");
   const [copied, setCopied] = useState(false);
 
@@ -149,13 +157,16 @@ function Report({ fp }: { fp: Fingerprint }) {
       <section className="py-14 lg:py-20">
         <p className="label mb-4">Your JA4 fingerprint</p>
 
-        <h1 className="no-scrollbar mb-6 overflow-x-auto whitespace-nowrap font-mono text-[clamp(1rem,4.4vw,2.6rem)] font-medium tracking-tight">
-          <span className="text-ink">{a}</span>
-          <span className="text-muted-foreground">_</span>
-          <span className="text-canopy">{b}</span>
-          <span className="text-muted-foreground">_</span>
-          <span className="text-canopy">{c}</span>
-        </h1>
+        <div className="no-scrollbar mb-8 overflow-x-auto">
+          <h1 className="whitespace-nowrap font-mono text-[clamp(1.05rem,4.6vw,2.75rem)] font-medium tracking-tight">
+            <span className="text-ink">{a}</span>
+            <span className="text-muted-foreground">_</span>
+            <span className="text-canopy">{b}</span>
+            <span className="text-muted-foreground">_</span>
+            <span className="text-canopy">{c}</span>
+          </h1>
+        </div>
+
 
         {/* The verdict, led by the cat. Terracotta is the brand's single focal
             point, so it is spent only on the disagreement case. */}
@@ -192,10 +203,20 @@ function Report({ fp }: { fp: Fingerprint }) {
               <span className="font-mono text-[12px]">{leaked}</span> values
               volunteered
             </p>
+
           </div>
 
           <div className="shrink-0">
-            <Button onClick={copy}>{copied ? "Copied" : "Copy JA4"}</Button>
+            <Button onClick={copy}>
+              <span className="inline-grid">
+                <span aria-hidden className="invisible col-start-1 row-start-1">
+                  Copy JA4
+                </span>
+                <span className="col-start-1 row-start-1">
+                  {copied ? "Copied" : "Copy JA4"}
+                </span>
+              </span>
+            </Button>
           </div>
         </div>
       </section>
@@ -230,146 +251,17 @@ function Report({ fp }: { fp: Fingerprint }) {
         />
       )}
 
-      <div className="grid grid-cols-1 gap-5 pb-4 md:grid-cols-2 lg:grid-cols-3">
-        <section className="panel">
-          <h2 className="label mb-4">Fingerprints</h2>
-          <dl className="space-y-0">
-            <Row label="JA4" value={fp.ja4} mono copyable />
-            <Row label="JA3" value={fp.ja3_hash} mono copyable />
-            {fp.http2 && (
-              <Row
-                label="Akamai"
-                value={fp.http2.akamai_fingerprint}
-                mono
-                copyable
-              />
-            )}
-          </dl>
-          <p className="label mb-2 mt-5">JA4 before hashing</p>
-          <p className="break-all rounded-lg border border-line bg-muted/50 px-3 py-2 font-mono text-[11px] leading-relaxed">
-            {fp.ja4_r}
-          </p>
-        </section>
+      <div className="mb-5 flex flex-wrap items-center gap-3 pt-2">
+        <ViewPicker value={view} onChange={setView} />
+      </div>
 
-        <section className="panel">
-          <h2 className="label mb-4">Why we think that</h2>
-          {verdict.signals.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Nothing distinctive in this handshake. That&rsquo;s unusual. Most
-              stacks leak something.
-            </p>
-          ) : (
-            <ul className="space-y-2.5">
-              {verdict.signals.map((s, i) => (
-                <li key={i} className="flex items-baseline gap-2.5 text-sm">
-                  <span className="shrink-0 rounded-full border border-line px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
-                    {s.implies}
-                  </span>
-                  <span className="text-muted-foreground">{s.observed}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="panel">
-          <h2 className="label mb-4">TLS</h2>
-          <dl>
-            <Row label="Negotiated" value={fp.tls.negotiated_version} mono />
-            <Row label="Offered (max)" value={fp.tls.effective_version} mono />
-            <Row label="Legacy field" value={fp.tls.legacy_version} mono />
-            <Row label="Cipher" value={fp.tls.negotiated_cipher} mono />
-            <Row label="SNI" value={fp.tls.sni ?? "not sent"} mono />
-            <Row
-              label="Session ID"
-              value={`${fp.tls.session_id_length} bytes`}
-              mono
-            />
-          </dl>
-          <p className="label mb-2 mt-5">ALPN offered</p>
-          <div className="flex flex-wrap gap-1.5">
-            {fp.tls.alpn.length === 0 && (
-              <span className="rounded-full border border-line px-2.5 py-0.5 font-mono text-[11px] text-muted-foreground">
-                none
-              </span>
-            )}
-            {fp.tls.alpn.map((p) => (
-              <span
-                key={p}
-                className={`rounded-full px-2.5 py-0.5 font-mono text-[11px] ${
-                  p === fp.tls.negotiated_alpn
-                    ? "bg-canopy text-snow"
-                    : "border border-line text-muted-foreground"
-                }`}
-              >
-                {p}
-              </span>
-            ))}
-          </div>
-        </section>
-
-        {fp.http2 && (
-          <section className="panel">
-            <h2 className="label mb-4">HTTP/2</h2>
-            <dl>
-              <Row
-                label="Pseudo-header order"
-                value={fp.http2.pseudo_header_order.join(", ")}
-                mono
-              />
-              <Row
-                label="Window update"
-                value={
-                  fp.http2.window_update === null
-                    ? "none"
-                    : fp.http2.window_update.toLocaleString()
-                }
-                mono
-              />
-              <Row
-                label="PRIORITY frames"
-                value={String(fp.http2.priorities.length)}
-                mono
-              />
-            </dl>
-            <p className="label mb-2 mt-5">SETTINGS, in the order sent</p>
-            <dl>
-              {fp.http2.settings.map((s) => (
-                <Row
-                  key={s.id}
-                  label={s.name.toLowerCase().replace(/_/g, " ")}
-                  value={s.value.toLocaleString()}
-                  mono
-                />
-              ))}
-            </dl>
-          </section>
-        )}
-
-        {fp.http1 && (
-          <section className="panel">
-            <h2 className="label mb-4">HTTP/1.1 header order</h2>
-            <dl>
-              {fp.http1.headers.map(([k, v], i) => (
-                <Row
-                  key={`${k}-${i}`}
-                  label={k}
-                  value={v.length > 48 ? `${v.slice(0, 48)}…` : v}
-                  mono
-                />
-              ))}
-            </dl>
-          </section>
-        )}
-
-        <section className="panel">
-          <h2 className="label mb-4">Connection</h2>
-          <dl>
-            <Row label="IP" value={fp.ip} mono />
-            <Row label="Protocol" value={fp.protocol} mono />
-            <Row label="User-Agent" value={fp.user_agent ?? "not sent"} mono />
-          </dl>
-        </section>
+      <div className="pb-4">
+        <ReportBody
+          view={view}
+          fp={fp}
+          verdict={verdict}
+          sections={sections}
+        />
       </div>
 
       <details className="panel group mb-10 p-0">
@@ -382,80 +274,5 @@ function Report({ fp }: { fp: Fingerprint }) {
         </pre>
       </details>
     </>
-  );
-}
-
-/**
- * Long values get their own line rather than being crushed into a 38% column.
- * A JA4 or an Akamai string is 40+ unbroken characters; side-by-side it either
- * overflows the card or wraps into a ragged two-character-wide ribbon.
- */
-const STACK_ABOVE = 26;
-
-function Row({
-  label,
-  value,
-  mono,
-  copyable,
-}: {
-  label: string;
-  value: string | null;
-  mono?: boolean;
-  copyable?: boolean;
-}) {
-  if (value === null) return null;
-  const stacked = value.length > STACK_ABOVE;
-
-  return (
-    <div
-      className={`border-b border-line/60 py-2 last:border-b-0 ${
-        stacked
-          ? ""
-          : "grid grid-cols-[minmax(88px,40%)_1fr] items-baseline gap-3"
-      }`}
-    >
-      <dt
-        className={`text-[13px] text-muted-foreground ${stacked ? "mb-1" : ""}`}
-      >
-        {label}
-      </dt>
-      <dd
-        className={`min-w-0 text-[13px] ${
-          mono ? "break-all font-mono" : "break-words"
-        }`}
-      >
-        {copyable ? <CopyValue value={value} /> : value}
-      </dd>
-    </div>
-  );
-}
-
-/** Click-to-copy, because every value in this panel is meant to be pasted. */
-function CopyValue({ value }: { value: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      onClick={() => {
-        navigator.clipboard?.writeText(value).then(
-          () => {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1400);
-          },
-          () => {},
-        );
-      }}
-      title="Copy"
-      className="group/c -mx-1 rounded px-1 text-left transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--ring))]"
-    >
-      <span className="break-all">{value}</span>
-      <span
-        className={`ml-1.5 align-middle text-[10px] ${
-          copied ? "text-canopy" : "text-muted-foreground opacity-0 group-hover/c:opacity-100"
-        }`}
-      >
-        {copied ? "copied" : "copy"}
-      </span>
-    </button>
   );
 }
