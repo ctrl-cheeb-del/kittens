@@ -42,8 +42,12 @@ export interface Classification {
   mismatch: boolean;
 }
 
-const EXT_ALPS = 0x4469;
-const EXT_ALPS_OLD = 0x4468;
+// Chrome moved ALPS from the old codepoint to the new one (BoringSSL
+// 17513 -> 17613). Current Chrome sends only 0x44cd, so recognising just the
+// old value makes a modern Chrome look like it has no ALPS at all — which
+// reads as Safari.
+const EXT_ALPS = 0x44cd;
+const EXT_ALPS_OLD = 0x4469;
 const EXT_RECORD_SIZE_LIMIT = 0x001c;
 const EXT_DELEGATED_CREDENTIALS = 0x0022;
 const EXT_COMPRESS_CERT = 0x001b;
@@ -229,12 +233,58 @@ export function classify(fp: Fingerprint): Classification {
   const mismatch =
     uaFamily !== null && family !== "Unknown" && uaFamily !== family && confidence >= 40;
 
+  // Sort the winner's evidence to the top. Leading with a signal that
+  // contradicts the verdict reads as a bug, even when the tally is right.
+  const ordered = [...signals].sort((a, b) => {
+    const aWins = a.implies === family ? 1 : 0;
+    const bWins = b.implies === family ? 1 : 0;
+    if (aWins !== bWins) return bWins - aWins;
+    return b.weight - a.weight;
+  });
+
   return {
     family,
     confidence,
-    signals: signals.sort((a, b) => b.weight - a.weight),
+    signals: ordered,
     uaFamily,
     uaRaw: fp.user_agent,
     mismatch,
   };
+}
+
+/**
+ * Count the distinct values the client volunteered across every fingerprinted
+ * list. Deliberately a count of observed facts, not an invented rarity
+ * statistic: we have no corpus to say "1 in N clients look like you", and
+ * making one up would be the most quotable wrong number on the page.
+ */
+export function volunteered(fp: Fingerprint): number {
+  const notGrease = (x: { grease: boolean }) => !x.grease;
+  return (
+    fp.tls.cipher_suites.filter(notGrease).length +
+    fp.tls.extensions.filter(notGrease).length +
+    fp.tls.supported_groups.filter(notGrease).length +
+    fp.tls.signature_algorithms.filter(notGrease).length +
+    (fp.http2?.settings.length ?? 0)
+  );
+}
+
+/** One plain sentence, which most visitors will read instead of the tables. */
+export function headline(fp: Fingerprint, v: Classification): string {
+  if (v.mismatch) {
+    return `Your User-Agent says ${v.uaFamily}. Your handshake says ${v.family}.`;
+  }
+  if (v.family === "Unknown") {
+    return "Nothing in this handshake is distinctive enough to place it.";
+  }
+  if (!v.uaFamily) {
+    return `This handshake looks like ${v.family}. No User-Agent to check it against.`;
+  }
+  return `You look exactly like what you claim to be.`;
+}
+
+export function moodFor(v: Classification): "content" | "suspicious" | "curious" {
+  if (v.mismatch) return "suspicious";
+  if (v.family === "Unknown") return "curious";
+  return "content";
 }

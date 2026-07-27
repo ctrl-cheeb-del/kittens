@@ -30,8 +30,11 @@ pub const EXT_RECORD_SIZE_LIMIT: u16 = 0x001c;
 pub const EXT_SUPPORTED_VERSIONS: u16 = 0x002b;
 pub const EXT_PSK_KEY_EXCHANGE_MODES: u16 = 0x002d;
 pub const EXT_KEY_SHARE: u16 = 0x0033;
-pub const EXT_APPLICATION_SETTINGS: u16 = 0x4469; // ALPS, Chrome
-pub const EXT_APPLICATION_SETTINGS_OLD: u16 = 0x4468;
+// ALPS. Chrome moved this from the old codepoint to the new one
+// (BoringSSL 17513 -> 17613), and current Chrome sends only 0x44cd. Both are
+// recognised, or a modern Chrome reads as "no ALPS" and gets misidentified.
+pub const EXT_APPLICATION_SETTINGS_OLD: u16 = 0x4469;
+pub const EXT_APPLICATION_SETTINGS: u16 = 0x44cd;
 
 /// A single extension, retained in the order it appeared on the wire.
 #[derive(Debug, Clone)]
