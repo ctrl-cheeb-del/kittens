@@ -187,6 +187,7 @@ where
         };
 
         idle_frames += 1;
+        obs.total_frames += 1;
         if idle_frames > MAX_IDLE_FRAMES {
             bail!("too many frames without a request");
         }

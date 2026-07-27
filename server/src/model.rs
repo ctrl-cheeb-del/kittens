@@ -50,6 +50,23 @@ pub struct ExtensionInfo {
 }
 
 #[derive(Debug, Serialize)]
+pub struct SpanInfo {
+    pub start: usize,
+    pub end: usize,
+    pub label: String,
+}
+
+/// The ClientHello exactly as it arrived, plus what each byte range is.
+/// Lets a client render an annotated hex dump without reimplementing the
+/// parser.
+#[derive(Debug, Serialize)]
+pub struct RawHello {
+    pub hex: String,
+    pub length: usize,
+    pub spans: Vec<SpanInfo>,
+}
+
+#[derive(Debug, Serialize)]
 pub struct TlsInfo {
     /// Version actually negotiated by rustls, once the handshake completed.
     pub negotiated_version: Option<String>,
@@ -77,6 +94,7 @@ pub struct TlsInfo {
     pub alpn: Vec<String>,
     pub application_settings: Vec<String>,
     pub record_size_limit: Option<u16>,
+    pub raw: RawHello,
 }
 
 #[derive(Debug, Serialize)]
@@ -102,6 +120,8 @@ pub struct Http2Info {
     pub window_update: Option<u32>,
     pub priorities: Vec<PriorityInfo>,
     pub pseudo_header_order: Vec<String>,
+    /// Total frames the client sent on this connection.
+    pub total_frames: usize,
     /// Every header in wire order, pseudo-headers included.
     pub headers: Vec<[String; 2]>,
 }
@@ -252,6 +272,19 @@ pub fn build(cap: &Capture) -> Fingerprint {
         alpn: ch.alpn_strings(),
         application_settings: ch.application_settings_strings(),
         record_size_limit: ch.record_size_limit,
+        raw: RawHello {
+            hex: hex::encode(&ch.raw),
+            length: ch.raw.len(),
+            spans: ch
+                .spans
+                .iter()
+                .map(|s| SpanInfo {
+                    start: s.start,
+                    end: s.end,
+                    label: s.label.clone(),
+                })
+                .collect(),
+        },
     };
 
     let http2 = cap.h2.map(|(obs, headers)| {
@@ -275,6 +308,7 @@ pub fn build(cap: &Capture) -> Fingerprint {
                 .iter()
                 .map(|c| c.to_string())
                 .collect(),
+            total_frames: obs.total_frames,
             headers: header_pairs(headers),
         }
     });
@@ -452,6 +486,7 @@ mod tests {
             window_update: Some(15663105),
             priorities: vec![],
             pseudo_header_order: vec!['m', 'a', 's', 'p'],
+            ..Default::default()
         };
         let headers = vec![
             (":method".to_string(), "GET".to_string()),

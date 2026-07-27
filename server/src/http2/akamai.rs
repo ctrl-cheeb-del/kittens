@@ -30,6 +30,10 @@ pub struct Observation {
     pub priorities: Vec<Priority>,
     /// Pseudo-headers in wire order, as their single-letter codes.
     pub pseudo_header_order: Vec<char>,
+    /// Every frame the client sent on this connection. Not part of the
+    /// fingerprint, but a cheap tell: stacks differ in how much they say
+    /// before asking for anything.
+    pub total_frames: usize,
 }
 
 /// Map a pseudo-header name to its fingerprint letter.
@@ -111,6 +115,7 @@ mod tests {
             window_update: Some(15663105),
             priorities: vec![],
             pseudo_header_order: vec!['m', 'a', 's', 'p'],
+            ..Default::default()
         };
         assert_eq!(
             fingerprint(&obs),
@@ -134,6 +139,7 @@ mod tests {
                 prio(13, false, 0, 241),
             ],
             pseudo_header_order: vec!['m', 'p', 'a', 's'],
+            ..Default::default()
         };
         assert_eq!(
             fingerprint(&obs),
@@ -148,6 +154,7 @@ mod tests {
             window_update: None,
             priorities: vec![],
             pseudo_header_order: vec![],
+            ..Default::default()
         };
         assert_eq!(fingerprint(&obs), "|00|0|");
     }

@@ -36,6 +36,15 @@ pub const EXT_KEY_SHARE: u16 = 0x0033;
 pub const EXT_APPLICATION_SETTINGS_OLD: u16 = 0x4469;
 pub const EXT_APPLICATION_SETTINGS: u16 = 0x44cd;
 
+/// A labelled byte range within the raw handshake message, so the UI can
+/// annotate a hex dump with what each region actually is.
+#[derive(Debug, Clone)]
+pub struct Span {
+    pub start: usize,
+    pub end: usize,
+    pub label: String,
+}
+
 /// A single extension, retained in the order it appeared on the wire.
 #[derive(Debug, Clone)]
 pub struct Extension {
@@ -70,6 +79,11 @@ pub struct ClientHello {
     pub cert_compression_algs: Vec<u16>,
     pub record_size_limit: Option<u16>,
     pub application_settings: Vec<Vec<u8>>,
+
+    /// The reassembled handshake message, exactly as it arrived.
+    pub raw: Vec<u8>,
+    /// Labelled regions of `raw`, in offset order.
+    pub spans: Vec<Span>,
 }
 
 impl ClientHello {
@@ -231,7 +245,11 @@ pub fn parse_from_records(buf: &[u8]) -> Result<ParseOutcome> {
         if handshake.len() >= 4 {
             let msg_len = u32::from_be_bytes([0, handshake[1], handshake[2], handshake[3]]) as usize;
             if handshake.len() >= 4 + msg_len {
-                return parse_handshake(&handshake[..4 + msg_len]).map(|ch| ParseOutcome::Complete(Box::new(ch)));
+                let msg = &handshake[..4 + msg_len];
+                return parse_handshake(msg).map(|mut ch| {
+                    ch.raw = msg.to_vec();
+                    ParseOutcome::Complete(Box::new(ch))
+                });
             }
         }
         // Otherwise loop for the next record fragment.
@@ -250,31 +268,75 @@ fn parse_handshake(msg: &[u8]) -> Result<ClientHello> {
     let body = r.take(body_len)?;
 
     let mut r = Reader::new(body);
-    let mut ch = ClientHello {
-        legacy_version: r.u16()?,
-        random: r.take(32)?.to_vec(),
-        session_id: r.vec8()?.to_vec(),
-        ..Default::default()
+    let mut ch = ClientHello::default();
+    let mut spans: Vec<Span> = Vec::new();
+
+    // Offsets are recorded against the whole handshake message, which begins
+    // with a 4-byte type+length header before the body Reader's origin.
+    const BASE: usize = 4;
+    let mut mark = |spans: &mut Vec<Span>, from: usize, to: usize, label: &str| {
+        spans.push(Span {
+            start: BASE + from,
+            end: BASE + to,
+            label: label.to_string(),
+        });
     };
 
+    spans.push(Span {
+        start: 0,
+        end: BASE,
+        label: "handshake header".into(),
+    });
+
+    let p = r.pos;
+    ch.legacy_version = r.u16()?;
+    mark(&mut spans, p, r.pos, "legacy_version");
+
+    let p = r.pos;
+    ch.random = r.take(32)?.to_vec();
+    mark(&mut spans, p, r.pos, "random");
+
+    let p = r.pos;
+    ch.session_id = r.vec8()?.to_vec();
+    mark(&mut spans, p, r.pos, "session_id");
+
+    let p = r.pos;
     let ciphers = r.vec16()?;
     ch.cipher_suites = Reader::new(ciphers).u16_list()?;
+    mark(&mut spans, p, r.pos, "cipher_suites");
+
+    let p = r.pos;
     ch.compression_methods = r.vec8()?.to_vec();
+    mark(&mut spans, p, r.pos, "compression_methods");
 
     // Extensions are optional in the grammar (SSLv3-era clients omit them).
     if r.is_empty() {
+        ch.spans = spans;
         return Ok(ch);
     }
 
+    let ext_len_at = r.pos;
     let ext_block = r.vec16()?;
+    // Where the extension block's contents begin, after its 2-byte length.
+    let ext_origin = ext_len_at + 2;
+    mark(&mut spans, ext_len_at, ext_origin, "extensions length");
+
     let mut er = Reader::new(ext_block);
     while !er.is_empty() {
+        let start = er.pos;
         let typ = er.u16()?;
         let data = er.vec16()?.to_vec();
+        mark(
+            &mut spans,
+            ext_origin + start,
+            ext_origin + er.pos,
+            &format!("ext {typ:#06x}"),
+        );
         decode_extension(&mut ch, typ, &data)?;
         ch.extensions.push(Extension { typ, data });
     }
 
+    ch.spans = spans;
     Ok(ch)
 }
 
