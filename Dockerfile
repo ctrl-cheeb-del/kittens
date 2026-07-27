@@ -50,7 +50,8 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENV KITTENS_STATIC_DIR=/srv/site
 
-EXPOSE 443
+# Unprivileged: the server runs as a non-root user and cannot bind 443.
+EXPOSE 8443
 
 # Starts as root only long enough to take ownership of the mounted volume,
 # then execs the server as an unprivileged user.

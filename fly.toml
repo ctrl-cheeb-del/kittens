@@ -5,8 +5,10 @@ primary_region = "lhr"
   dockerfile = "Dockerfile"
 
 [env]
-  # Bind dual-stack: Fly forwards raw TCP to this internal port.
-  KITTENS_BIND = "[::]:443"
+  # Unprivileged port on purpose. The server drops to a non-root user before
+  # binding, and 443 is privileged, so binding it directly fails with EACCES.
+  # Fly forwards external 443 to this port with the TCP stream untouched.
+  KITTENS_BIND = "[::]:8443"
   # One app answers for all three names. tls.kittens.sh is kept as an alias so
   # any existing links or docs referring to it keep working.
   KITTENS_DOMAINS = "kittens.sh,www.kittens.sh,tls.kittens.sh"
@@ -25,7 +27,7 @@ primary_region = "lhr"
   destination = "/data"
 
 [[services]]
-  internal_port = 443
+  internal_port = 8443
   protocol = "tcp"
   # A volume pins this app to one machine, so never scale to zero: a cold
   # start would also mean re-reading certs on the first visitor's request.
