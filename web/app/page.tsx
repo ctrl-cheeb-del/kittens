@@ -17,7 +17,13 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/Button";
 import { Cat } from "@/components/Cat";
 import { Tape } from "@/components/Tape";
-import { classify, headline, moodFor, subline } from "@/lib/classify";
+import {
+  classify,
+  headline,
+  moodFor,
+  subline,
+  volunteered,
+} from "@/lib/classify";
 import type { Fingerprint } from "@/lib/types";
 
 const ORIGIN = process.env.NEXT_PUBLIC_ORIGIN_URL ?? "";
@@ -123,6 +129,7 @@ function Report({ fp }: { fp: Fingerprint }) {
   const verdict = classify(fp);
   const mood = moodFor(verdict);
   const sub = subline(fp, verdict);
+  const leaked = volunteered(fp);
   const [a, b, c] = fp.ja4.split("_");
   const [copied, setCopied] = useState(false);
 
@@ -179,7 +186,12 @@ function Report({ fp }: { fp: Fingerprint }) {
                 </span>
               )}
             </p>
-            {sub && <p className="mt-0.5 text-sm text-muted-foreground">{sub}</p>}
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {sub}
+              {sub && " · "}
+              <span className="font-mono text-[12px]">{leaked}</span> values
+              volunteered
+            </p>
           </div>
 
           <div className="shrink-0">

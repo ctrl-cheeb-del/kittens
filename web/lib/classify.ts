@@ -271,3 +271,20 @@ export function moodFor(v: Classification): "content" | "suspicious" | "curious"
   if (v.family === "Unknown") return "curious";
   return "content";
 }
+
+/**
+ * Count the distinct values the client volunteered across every fingerprinted
+ * list. Deliberately a count of observed facts, not an invented rarity
+ * statistic: we have no corpus to say "1 in N clients look like you", and
+ * making one up would be the most quotable wrong number on the page.
+ */
+export function volunteered(fp: Fingerprint): number {
+  const notGrease = (x: { grease: boolean }) => !x.grease;
+  return (
+    fp.tls.cipher_suites.filter(notGrease).length +
+    fp.tls.extensions.filter(notGrease).length +
+    fp.tls.supported_groups.filter(notGrease).length +
+    fp.tls.signature_algorithms.filter(notGrease).length +
+    (fp.http2?.settings.length ?? 0)
+  );
+}
