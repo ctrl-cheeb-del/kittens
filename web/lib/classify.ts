@@ -252,35 +252,18 @@ export function classify(fp: Fingerprint): Classification {
   };
 }
 
-/**
- * Count the distinct values the client volunteered across every fingerprinted
- * list. Deliberately a count of observed facts, not an invented rarity
- * statistic: we have no corpus to say "1 in N clients look like you", and
- * making one up would be the most quotable wrong number on the page.
- */
-export function volunteered(fp: Fingerprint): number {
-  const notGrease = (x: { grease: boolean }) => !x.grease;
-  return (
-    fp.tls.cipher_suites.filter(notGrease).length +
-    fp.tls.extensions.filter(notGrease).length +
-    fp.tls.supported_groups.filter(notGrease).length +
-    fp.tls.signature_algorithms.filter(notGrease).length +
-    (fp.http2?.settings.length ?? 0)
-  );
+/** The verdict, in as few words as it takes. */
+export function headline(v: Classification): string {
+  if (v.family === "Unknown") return "Handshake matches nothing we know.";
+  return `Handshake reads as ${v.family}.`;
 }
 
-/** One plain sentence, which most visitors will read instead of the tables. */
-export function headline(fp: Fingerprint, v: Classification): string {
-  if (v.mismatch) {
-    return `Your User-Agent says ${v.uaFamily}. Your handshake says ${v.family}.`;
-  }
-  if (v.family === "Unknown") {
-    return "Nothing in this handshake is distinctive enough to place it.";
-  }
-  if (!v.uaFamily) {
-    return `This handshake looks like ${v.family}. No User-Agent to check it against.`;
-  }
-  return `You look exactly like what you claim to be.`;
+/** One supporting line, or nothing. */
+export function subline(fp: Fingerprint, v: Classification): string | null {
+  const claim = describeClient(fp);
+  if (v.mismatch) return `User-Agent claims ${claim}. It isn't.`;
+  if (claim === "Unrecognised client") return null;
+  return `Claims ${claim}.`;
 }
 
 export function moodFor(v: Classification): "content" | "suspicious" | "curious" {

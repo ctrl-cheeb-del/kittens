@@ -17,13 +17,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/Button";
 import { Cat } from "@/components/Cat";
 import { Tape } from "@/components/Tape";
-import {
-  classify,
-  describeClient,
-  headline,
-  moodFor,
-  volunteered,
-} from "@/lib/classify";
+import { classify, headline, moodFor, subline } from "@/lib/classify";
 import type { Fingerprint } from "@/lib/types";
 
 const ORIGIN = process.env.NEXT_PUBLIC_ORIGIN_URL ?? "";
@@ -128,7 +122,7 @@ function ErrorState({ message }: { message: string }) {
 function Report({ fp }: { fp: Fingerprint }) {
   const verdict = classify(fp);
   const mood = moodFor(verdict);
-  const leaked = volunteered(fp);
+  const sub = subline(fp, verdict);
   const [a, b, c] = fp.ja4.split("_");
   const [copied, setCopied] = useState(false);
 
@@ -167,7 +161,7 @@ function Report({ fp }: { fp: Fingerprint }) {
         >
           <Cat
             mood={mood}
-            className={`h-16 w-16 shrink-0 ${
+            className={`shrink-0 ${
               verdict.mismatch
                 ? "text-terracotta"
                 : mood === "curious"
@@ -178,44 +172,20 @@ function Report({ fp }: { fp: Fingerprint }) {
 
           <div className="min-w-0 flex-1">
             <p className="font-display text-xl font-bold leading-snug tracking-tight">
-              {headline(fp, verdict)}
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {verdict.family !== "Unknown" && (
-                <>
-                  Handshake reads as{" "}
-                  <strong className="font-semibold text-ink">
-                    {verdict.family}
-                  </strong>{" "}
-                  <span className="font-mono text-[11px]">
-                    ({verdict.confidence}% of its tells)
-                  </span>
-                  {". "}
-                </>
+              {headline(verdict)}
+              {verdict.confidence > 0 && (
+                <span className="ml-2 align-middle font-mono text-[11px] font-normal text-muted-foreground">
+                  {verdict.confidence}%
+                </span>
               )}
-              Claims to be{" "}
-              <strong className="font-semibold text-ink">
-                {describeClient(fp)}
-              </strong>
-              {". "}
-              It volunteered{" "}
-              <strong className="font-semibold text-ink">{leaked}</strong>{" "}
-              distinct values across its cipher, extension, group, signature and
-              SETTINGS lists. Any one of them can tell you apart.
             </p>
+            {sub && <p className="mt-0.5 text-sm text-muted-foreground">{sub}</p>}
           </div>
 
           <div className="shrink-0">
             <Button onClick={copy}>{copied ? "Copied" : "Copy JA4"}</Button>
           </div>
         </div>
-
-        {verdict.mismatch && (
-          <p className="mt-3 text-sm text-muted-foreground">
-            That is what an impersonation library looks like before it matches
-            its target.
-          </p>
-        )}
       </section>
 
       <Tape
