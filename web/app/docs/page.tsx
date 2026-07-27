@@ -158,9 +158,33 @@ fi`}</Code>
       </main>
 
       <footer className="border-t border-line">
-        <div className="mx-auto w-full max-w-[1240px] px-6 py-8 text-sm lg:px-8">
-          <a href="/" className="text-muted-foreground transition-colors hover:text-ink">
+        <div className="mx-auto flex w-full max-w-[1240px] flex-wrap items-center gap-x-6 gap-y-2 px-6 py-8 text-sm text-muted-foreground lg:px-8">
+          <a href="/" className="transition-colors hover:text-ink">
             ← Back to the inspector
+          </a>
+          <span>
+            Sponsored by{" "}
+            <a
+              href="https://revnu.com"
+              className="font-medium text-canopy underline-offset-2 hover:underline"
+            >
+              Revnu
+            </a>
+          </span>
+          <span>
+            Made by{" "}
+            <a
+              href="https://freebrey.art"
+              className="font-medium text-ink underline-offset-2 hover:underline"
+            >
+              Art Freebrey
+            </a>
+          </span>
+          <a
+            href="https://github.com/ctrl-cheeb-del/kittens"
+            className="underline-offset-2 hover:text-ink hover:underline"
+          >
+            Source
           </a>
         </div>
       </footer>

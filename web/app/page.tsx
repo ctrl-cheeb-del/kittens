@@ -105,12 +105,43 @@ function Masthead() {
   );
 }
 
+const REPO_URL = "https://github.com/ctrl-cheeb-del/kittens";
+
 function Footer() {
   return (
     <footer className="mt-8 border-t border-line">
-      <div className="mx-auto flex w-full max-w-[1240px] flex-wrap justify-between gap-3 px-6 py-8 text-sm text-muted-foreground lg:px-8">
-        <span>Measured from your connection. Nothing is stored.</span>
-        <span className="font-mono text-[11px]">JA3 · JA4 · Akamai HTTP/2</span>
+      <div className="mx-auto w-full max-w-[1240px] px-6 py-8 lg:px-8">
+        <div className="flex flex-wrap justify-between gap-3 text-sm text-muted-foreground">
+          <span>Measured from your connection. Nothing is stored.</span>
+          <span className="font-mono text-[11px]">JA3 · JA4 · Akamai HTTP/2</span>
+        </div>
+
+        <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-line pt-5 text-sm text-muted-foreground">
+          <span>
+            Sponsored by{" "}
+            <a
+              href="https://revnu.com"
+              className="font-medium text-canopy underline-offset-2 hover:underline"
+            >
+              Revnu
+            </a>
+          </span>
+          <span>
+            Made by{" "}
+            <a
+              href="https://freebrey.art"
+              className="font-medium text-ink underline-offset-2 hover:underline"
+            >
+              Art Freebrey
+            </a>
+          </span>
+          <a
+            href={REPO_URL}
+            className="underline-offset-2 hover:text-ink hover:underline"
+          >
+            Source
+          </a>
+        </div>
       </div>
     </footer>
   );
