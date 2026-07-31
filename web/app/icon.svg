@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Source for app/icon.svg and app/favicon.ico. A cat head reduced to the
+       shapes that still read at 16px: two ears, a round face, two eyes. -->
+  <rect width="64" height="64" rx="14" fill="#1C8F4C"/>
+  <path d="M14 20 L14 34 L24 24 Z" fill="#F9F6F1"/>
+  <path d="M50 20 L50 34 L40 24 Z" fill="#F9F6F1"/>
+  <circle cx="32" cy="36" r="16" fill="#F9F6F1"/>
+  <circle cx="26" cy="34" r="2.6" fill="#1C8F4C"/>
+  <circle cx="38" cy="34" r="2.6" fill="#1C8F4C"/>
+  <path d="M29 42 L32 45 L35 42" fill="none" stroke="#1C8F4C" stroke-width="2.4"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
