@@ -1,309 +1,44 @@
-"use client";
-
 /**
- * The measurement must happen in the visitor's own browser.
+ * The home page is a server component so everything except the measurement
+ * itself is in the HTML.
  *
- * This fetch is client-side on purpose. Anything server-rendered would
- * fingerprint the machine that built the page, not the visitor, and the site
- * would be silently, confidently wrong.
- *
- * In production it is same-origin: the Rust server serves both this page and
- * /api/all, so the fetch reuses the connection that loaded the page. Setting
- * NEXT_PUBLIC_ORIGIN_URL points it at a separate host, which is only used for
- * local development against `next dev`.
+ * The measurement cannot be: a fingerprint rendered at build time would
+ * describe the build machine. That part lives in <Inspector />, which fetches
+ * over the very connection that loaded this page. Everything below it is
+ * static prose, and is the only thing a crawler or an assistant without
+ * JavaScript will see.
  */
 
-import { useEffect, useState } from "react";
-import { Button } from "@/components/Button";
-import { Cat } from "@/components/Cat";
-import {
-  Report as ReportBody,
-  ViewPicker,
-  useView,
-} from "@/components/layouts";
-import { Tape } from "@/components/Tape";
-import {
-  classify,
-  headline,
-  moodFor,
-  subline,
-  volunteered,
-} from "@/lib/classify";
-import { buildSections } from "@/lib/sections";
-import type { Fingerprint } from "@/lib/types";
+import { SiteFooter, SiteHeader } from "@/components/Chrome";
+import { Explainer } from "@/components/Explainer";
+import { Inspector } from "@/components/Inspector";
+import { JsonLd } from "@/components/JsonLd";
+import { FAQ } from "@/lib/faq";
+import { SITE_URL } from "@/lib/seo";
 
-const ORIGIN = process.env.NEXT_PUBLIC_ORIGIN_URL ?? "";
-
-type State =
-  | { status: "loading" }
-  | { status: "ready"; data: Fingerprint }
-  | { status: "error"; message: string };
+const FAQ_SCHEMA = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "@id": `${SITE_URL}/#faq`,
+  mainEntity: FAQ.map(({ q, a }) => ({
+    "@type": "Question",
+    name: q,
+    acceptedAnswer: { "@type": "Answer", text: a },
+  })),
+};
 
 export default function Home() {
-  const [state, setState] = useState<State>({ status: "loading" });
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch(`${ORIGIN}/api/all`, { cache: "no-store" })
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`origin returned ${r.status}`);
-        return (await r.json()) as Fingerprint;
-      })
-      .then((data) => {
-        if (!cancelled) setState({ status: "ready", data });
-      })
-      .catch((e: unknown) => {
-        if (!cancelled) {
-          setState({
-            status: "error",
-            message: e instanceof Error ? e.message : String(e),
-          });
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   return (
     <div className="min-h-screen">
-      <Masthead />
+      <SiteHeader />
 
       <main className="mx-auto w-full max-w-[1240px] px-6 lg:px-8">
-        {state.status === "loading" && (
-          <p className="py-24 font-mono text-sm text-muted-foreground">
-            Reading your handshake.
-          </p>
-        )}
-
-        {state.status === "error" && <ErrorState message={state.message} />}
-        {state.status === "ready" && <Report fp={state.data} />}
+        <Inspector />
+        <Explainer />
       </main>
 
-      <Footer />
+      <SiteFooter />
+      <JsonLd data={FAQ_SCHEMA} />
     </div>
-  );
-}
-
-function Masthead() {
-  return (
-    <header className="border-b border-line">
-      <div className="mx-auto flex w-full max-w-[1240px] items-center justify-between px-6 py-5 lg:px-8">
-        <a href="/" className="font-display text-lg font-extrabold tracking-tight">
-          kittens<span className="text-canopy">.sh</span>
-        </a>
-        <nav className="flex items-center gap-6 text-sm text-muted-foreground">
-          <a href="/docs" className="transition-colors hover:text-ink">
-            Docs
-          </a>
-          <a href={`${ORIGIN}/api/all`} className="transition-colors hover:text-ink">
-            API
-          </a>
-        </nav>
-      </div>
-    </header>
-  );
-}
-
-const REPO_URL = "https://github.com/ctrl-cheeb-del/kittens";
-
-function Footer() {
-  return (
-    <footer className="mt-8 border-t border-line">
-      <div className="mx-auto w-full max-w-[1240px] px-6 py-8 lg:px-8">
-        <div className="flex flex-wrap justify-between gap-3 text-sm text-muted-foreground">
-          <span>Measured from your connection. Nothing is stored.</span>
-          <span className="font-mono text-[11px]">JA3 · JA4 · Akamai HTTP/2</span>
-        </div>
-
-        <div className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-line pt-5 text-sm text-muted-foreground">
-          <span>
-            Sponsored by{" "}
-            <a
-              href="https://revnu.com"
-              className="font-medium text-canopy underline-offset-2 hover:underline"
-            >
-              Revnu
-            </a>
-          </span>
-          <span>
-            Made by{" "}
-            <a
-              href="https://freebrey.art"
-              className="font-medium text-ink underline-offset-2 hover:underline"
-            >
-              Art Freebrey
-            </a>
-          </span>
-          <a
-            href={REPO_URL}
-            className="underline-offset-2 hover:text-ink hover:underline"
-          >
-            Source
-          </a>
-        </div>
-      </div>
-    </footer>
-  );
-}
-
-function ErrorState({ message }: { message: string }) {
-  return (
-    <div className="py-20">
-      <h1 className="h2 mb-3">We couldn&rsquo;t read your handshake.</h1>
-      <p className="lede mb-2">
-        The fingerprint origin didn&rsquo;t answer: {message}.
-      </p>
-      <p className="lede">
-        It terminates TLS itself, so it has to be reached directly. A proxy in
-        front of it would measure the proxy.
-      </p>
-    </div>
-  );
-}
-
-function Report({ fp }: { fp: Fingerprint }) {
-  const verdict = classify(fp);
-  const mood = moodFor(verdict);
-  const sub = subline(fp, verdict);
-  const leaked = volunteered(fp);
-  const sections = buildSections(fp, verdict);
-  const [view, setView] = useView();
-  const [a, b, c] = fp.ja4.split("_");
-  const [copied, setCopied] = useState(false);
-
-  const copy = () => {
-    navigator.clipboard?.writeText(fp.ja4).then(
-      () => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1600);
-      },
-      () => {},
-    );
-  };
-
-  return (
-    <>
-      {/* Hero: the fingerprint itself, in mono because that is what it is. */}
-      <section className="py-14 lg:py-20">
-        <p className="label mb-4">Your JA4 fingerprint</p>
-
-        <div className="no-scrollbar mb-8 overflow-x-auto">
-          <h1 className="whitespace-nowrap font-mono text-[clamp(1.05rem,4.6vw,2.75rem)] font-medium tracking-tight">
-            <span className="text-ink">{a}</span>
-            <span className="text-muted-foreground">_</span>
-            <span className="text-canopy">{b}</span>
-            <span className="text-muted-foreground">_</span>
-            <span className="text-canopy">{c}</span>
-          </h1>
-        </div>
-
-
-        {/* The verdict, led by the cat. Terracotta is the brand's single focal
-            point, so it is spent only on the disagreement case. */}
-        <div
-          className={`flex flex-col gap-4 rounded-2xl border p-5 sm:flex-row sm:items-center ${
-            verdict.mismatch
-              ? "border-terracotta/40 bg-terracotta/[0.05]"
-              : "border-line bg-card"
-          }`}
-        >
-          <Cat
-            mood={mood}
-            className={`shrink-0 ${
-              verdict.mismatch
-                ? "text-terracotta"
-                : mood === "curious"
-                  ? "text-muted-foreground"
-                  : "text-canopy"
-            }`}
-          />
-
-          <div className="min-w-0 flex-1">
-            <p className="font-display text-xl font-bold leading-snug tracking-tight">
-              {headline(verdict)}
-              {verdict.confidence > 0 && (
-                <span className="ml-2 align-middle font-mono text-[11px] font-normal text-muted-foreground">
-                  {verdict.confidence}%
-                </span>
-              )}
-            </p>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {sub}
-              {sub && " · "}
-              <span className="font-mono text-[12px]">{leaked}</span> values
-              volunteered
-            </p>
-
-          </div>
-
-          <div className="shrink-0">
-            <Button onClick={copy}>
-              <span className="inline-grid">
-                <span aria-hidden className="invisible col-start-1 row-start-1">
-                  Copy JA4
-                </span>
-                <span className="col-start-1 row-start-1">
-                  {copied ? "Copied" : "Copy JA4"}
-                </span>
-              </span>
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <Tape
-        title="Cipher suites, in the order offered"
-        cells={fp.tls.cipher_suites.map((x) => ({
-          hex: x.hex,
-          name: x.name,
-          grease: x.grease,
-        }))}
-      />
-
-      <Tape
-        title="Extensions, in the order sent"
-        cells={fp.tls.extensions.map((x) => ({
-          hex: x.hex,
-          name: x.name,
-          grease: x.grease,
-        }))}
-        note="SNI and ALPN counted, not hashed"
-      />
-
-      {fp.tls.supported_groups.length > 0 && (
-        <Tape
-          title="Key exchange groups"
-          cells={fp.tls.supported_groups.map((x) => ({
-            hex: x.hex,
-            name: x.name,
-            grease: x.grease,
-          }))}
-        />
-      )}
-
-      <div className="mb-5 flex flex-wrap items-center gap-3 pt-2">
-        <ViewPicker value={view} onChange={setView} />
-      </div>
-
-      <div className="pb-4">
-        <ReportBody
-          view={view}
-          fp={fp}
-          verdict={verdict}
-          sections={sections}
-        />
-      </div>
-
-      <details className="panel group mb-10 p-0">
-        <summary className="cursor-pointer list-none px-5 py-4 font-mono text-xs text-muted-foreground transition-colors hover:text-ink">
-          <span className="group-open:hidden">▸</span>
-          <span className="hidden group-open:inline">▾</span> Raw JSON
-        </summary>
-        <pre className="no-scrollbar overflow-x-auto px-5 pb-5 font-mono text-[11px] leading-relaxed text-muted-foreground">
-          {JSON.stringify(fp, null, 2)}
-        </pre>
-      </details>
-    </>
   );
 }
