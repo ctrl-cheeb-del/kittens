@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
+    "postbuild": "node scripts/export-markdown.mjs",
     "start": "next start -p ${PORT:-3000}",
     "typecheck": "tsc --noEmit"
   },

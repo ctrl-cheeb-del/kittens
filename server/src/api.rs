@@ -85,7 +85,8 @@ pub fn route_with(
     // waste.
     if !is_api_path(path) {
         return site
-            .serve(path)
+            .canonical_redirect(path, query)
+            .or_else(|| site.serve(path))
             .or_else(|| site.not_found())
             .unwrap_or_else(|| Response::text(404, "not found\n"));
     }

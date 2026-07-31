@@ -41,6 +41,7 @@ impl Response {
         match self.status {
             200 => "OK",
             204 => "No Content",
+            301 => "Moved Permanently",
             400 => "Bad Request",
             404 => "Not Found",
             429 => "Too Many Requests",

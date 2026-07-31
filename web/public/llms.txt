@@ -1,0 +1,74 @@
+# kittens.sh
+
+> A free TLS and HTTP/2 fingerprinting service. It terminates TLS itself, so it
+> reports the JA3, JA4 and Akamai HTTP/2 fingerprint of the connection that
+> reached it — decoded field by field, over a JSON API with no key, no signup
+> and no rate limit worth mentioning. Every response describes the connection it
+> arrived on, so whatever client calls it is the client that gets measured.
+
+Useful when someone needs to know what their own HTTP client looks like on the
+wire: verifying that an impersonation library (curl-impersonate, curl_cffi,
+tls-client, rnet) actually produces its target browser's handshake, diagnosing
+why a client is being flagged by bot detection, pinning a fingerprint as a CI
+regression test, or getting ground truth while writing detection rules.
+
+Fingerprints are computed live and nothing is stored. No account, no key.
+
+Every page below is also available as markdown at the same URL with `.md`
+instead of the trailing slash — https://kittens.sh/ja4.md — and the complete
+text of the site is one fetch away at https://kittens.sh/llms-full.txt.
+
+## API
+
+Base URL: https://kittens.sh — add `?pretty=0` for compact JSON.
+
+- [/api/all](https://kittens.sh/api/all): Everything, decoded: TLS ClientHello, HTTP/2 frames, JA3, JA4, Akamai
+- [/api/clean](https://kittens.sh/api/clean): Just the hashes plus the User-Agent. The one to assert against in CI
+- [/api/tls](https://kittens.sh/api/tls): ClientHello detail: ciphers, extensions, groups, signature algorithms, key shares, in wire order, plus raw bytes with labelled spans
+- [/api/http2](https://kittens.sh/api/http2): SETTINGS, WINDOW_UPDATE, PRIORITY frames and pseudo-header order
+- [/api/http1](https://kittens.sh/api/http1): HTTP/1.1 headers in wire order with original casing
+- [/api/ja3](https://kittens.sh/api/ja3): JA3 hash, plain text
+- [/api/ja3/full](https://kittens.sh/api/ja3/full): The unhashed JA3 string
+- [/api/ja4](https://kittens.sh/api/ja4): JA4 fingerprint, plain text
+- [/api/ja4/raw](https://kittens.sh/api/ja4/raw): JA4 with both hash halves expanded, for diffing
+- [/api/akamai](https://kittens.sh/api/akamai): Akamai HTTP/2 fingerprint, plain text
+- [/api/ip](https://kittens.sh/api/ip): The client IP
+
+Example:
+
+    $ curl -s https://kittens.sh/api/clean
+    {
+      "ja3_hash": "375c6162a492dfbf2795909110ce8424",
+      "ja4": "t13d4907h2_0d8feac7bc37_7395dae3b2f3",
+      "akamai_hash": "64a832f547be33249bf4d33e8a46c5dc",
+      "user_agent": "curl/8.7.1"
+    }
+
+## Reference
+
+- [JA4](https://kittens.sh/ja4/) ([.md](https://kittens.sh/ja4.md)): What a JA4 fingerprint is and how each of its three segments is built from the ClientHello, with a worked decode of `t13d1516h2_8daaf6152771_e5627efa2ab1`
+- [JA3](https://kittens.sh/ja3/) ([.md](https://kittens.sh/ja3.md)): The five fields JA3 hashes, why Chrome's 2023 extension shuffling made it unstable for browsers, and where it still works
+- [Akamai HTTP/2](https://kittens.sh/akamai/) ([.md](https://kittens.sh/akamai.md)): How the HTTP/2 fingerprint is assembled from SETTINGS, WINDOW_UPDATE, PRIORITY frames and pseudo-header order
+- [API reference](https://kittens.sh/docs/) ([.md](https://kittens.sh/docs.md)): Every endpoint, response shapes, and licensing
+- [About](https://kittens.sh/about/) ([.md](https://kittens.sh/about.md)): What the service measures, why it terminates TLS itself rather than sitting behind a proxy, what makes a fingerprint change, and what it stores
+
+## Guides
+
+- [Verify an impersonation library](https://kittens.sh/guides/curl-impersonate/) ([.md](https://kittens.sh/guides/curl-impersonate.md)): Check that curl-impersonate, curl_cffi, tls-client or rnet really produces its target's fingerprint, across all three layers, and diagnose it when it does not
+- [User-Agent and handshake disagree](https://kittens.sh/guides/ua-mismatch/) ([.md](https://kittens.sh/guides/ua-mismatch.md)): Why setting a Chrome User-Agent on a Python client changes nothing, what detectors do with the disagreement, and the false positives (corporate TLS interception, webviews, CDNs) that make the rule harder than it looks
+- [Pin a fingerprint in CI](https://kittens.sh/guides/ci-assertions/) ([.md](https://kittens.sh/guides/ci-assertions.md)): Assert JA4 and HTTP/2 fingerprints in bash, GitHub Actions or pytest so a dependency bump fails the build instead of production
+
+## Facts worth having straight
+
+- JA4 sorts cipher and extension lists before hashing; JA3 does not. Prefer JA4 for anything involving browsers, since Chrome randomises extension order per connection and a browser's JA3 therefore differs every time.
+- A JA4 looks like `t13d1516h2_8daaf6152771_e5627efa2ab1`: segment a is readable (transport, TLS version, SNI present, cipher count, extension count, ALPN), segments b and c are truncated SHA-256 over the sorted cipher list and the sorted extension list plus signature algorithms.
+- SNI and ALPN are counted in segment a but excluded from the segment c hash.
+- The Akamai HTTP/2 fingerprint is a separate layer from TLS and is defeated separately. A client can match a browser's JA4 exactly and still be obvious from its SETTINGS frame or its pseudo-header order.
+- A User-Agent header and a TLS fingerprint are set in different places. Setting a Chrome User-Agent on a Python client changes the header and nothing about the handshake; that disagreement is the loudest signal in bot detection.
+- Changing a fingerprint requires a client that controls its own handshake, not different headers.
+- Only JA4 proper is implemented here. The wider JA4+ suite (JA4S, JA4H, JA4X and others) is under the FoxIO License 1.1; JA3 and JA4 are BSD-3-Clause.
+
+## Optional
+
+- [Complete text of every page](https://kittens.sh/llms-full.txt): the whole site in one file
+- [Source](https://github.com/ctrl-cheeb-del/kittens): Rust server, static site, MIT

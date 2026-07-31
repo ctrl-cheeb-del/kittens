@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <!-- Source for public/og.png. Regenerate with:
+       rsvg-convert -w 1200 -h 630 assets/og.svg -o public/og.png -->
+  <rect width="1200" height="630" fill="#F9F6F1"/>
+  <rect x="0" y="0" width="1200" height="10" fill="#1C8F4C"/>
+
+  <!-- Wordmark -->
+  <text x="80" y="128" font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
+        font-size="40" font-weight="800" letter-spacing="-1" fill="#111111">kittens<tspan fill="#1C8F4C">.sh</tspan></text>
+
+  <!-- The thing itself, in mono, segment-coloured exactly as the site shows it -->
+  <text x="80" y="290" font-family="Menlo, DejaVu Sans Mono, monospace"
+        font-size="48" font-weight="500" letter-spacing="-1" fill="#111111">t13d1516h2<tspan fill="#6b6b6b">_</tspan><tspan fill="#1C8F4C">8daaf6152771</tspan><tspan fill="#6b6b6b">_</tspan><tspan fill="#1C8F4C">e5627efa2ab1</tspan></text>
+
+  <text x="80" y="370" font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
+        font-size="34" font-weight="400" fill="#6b6b6b">What your TLS handshake gives away.</text>
+  <text x="80" y="416" font-family="Helvetica Neue, Helvetica, Arial, sans-serif"
+        font-size="34" font-weight="400" fill="#6b6b6b">Decoded field by field, free API, nothing stored.</text>
+
+  <!-- Card holding the mascot, mirroring the verdict panel on the site -->
+  <g transform="translate(80, 470)">
+    <rect x="0" y="0" width="1040" height="104" rx="20" fill="#FFFFFF" stroke="#00000019" stroke-width="2"/>
+    <g font-family="Menlo, DejaVu Sans Mono, monospace" font-size="22" font-weight="500" fill="#1C8F4C">
+      <text x="34" y="38" xml:space="preserve"> /\_/\ </text>
+      <text x="34" y="62" xml:space="preserve">( ^.^ )</text>
+      <text x="34" y="86" xml:space="preserve"> &gt; ^ &lt; </text>
+    </g>
+    <text x="170" y="62" font-family="Menlo, DejaVu Sans Mono, monospace"
+          font-size="26" fill="#111111">JA3 · JA4 · Akamai HTTP/2</text>
+    <text x="1006" y="62" text-anchor="end" font-family="Menlo, DejaVu Sans Mono, monospace"
+          font-size="22" fill="#6b6b6b">kittens.sh</text>
+  </g>
+</svg>

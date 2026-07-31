@@ -112,6 +112,58 @@ impl StaticSite {
         })
     }
 
+    /// Redirect `/docs` to `/docs/`, the form the export actually writes.
+    ///
+    /// Both used to answer 200, which is one page living at two URLs: a crawler
+    /// indexes whichever it happened to find, and inbound links split between
+    /// them. Resolving it here rather than only in a `<link rel=canonical>`
+    /// means anything reading the site over HTTP — including a client that
+    /// never parses the HTML — lands on the same URL.
+    pub fn canonical_redirect(&self, url_path: &str, query: Option<&str>) -> Option<Response> {
+        if url_path.ends_with('/') {
+            return None;
+        }
+
+        // A final segment with a dot in it is a filename, never a directory
+        // index. Checking first keeps every /_next/static/* asset off this
+        // path without touching the filesystem.
+        let last = url_path.rsplit('/').next().unwrap_or("");
+        if last.is_empty() || last.contains('.') {
+            return None;
+        }
+
+        // The Location value is echoed from the request, so anything that
+        // could terminate a header early disqualifies it.
+        let controls = |s: &str| s.bytes().any(|b| b.is_ascii_control());
+        if controls(url_path) || query.is_some_and(controls) {
+            return None;
+        }
+
+        // Only redirect somewhere that exists. `resolve` appends index.html
+        // when the path names a directory, so that is what distinguishes a
+        // page from a missing file.
+        let resolved = self.resolve(url_path)?;
+        if resolved.file_name()? != "index.html" {
+            return None;
+        }
+
+        let location = match query {
+            Some(q) => format!("{url_path}/?{q}"),
+            None => format!("{url_path}/"),
+        };
+
+        Some(Response {
+            status: 301,
+            headers: vec![
+                ("location".into(), location),
+                // Structural and stable, but an hour keeps a mistake
+                // recoverable without waiting out a browser's permanent cache.
+                ("cache-control".into(), "public, max-age=3600".into()),
+            ],
+            body: Vec::new(),
+        })
+    }
+
     /// The exported 404 page, for unmatched non-API paths.
     pub fn not_found(&self) -> Option<Response> {
         let mut r = self.serve("/404.html")?;
@@ -135,6 +187,9 @@ fn content_type(ext: &str) -> &'static str {
         "gif" => "image/gif",
         "ico" => "image/x-icon",
         "txt" => "text/plain; charset=utf-8",
+        // The .md mirrors of each page, for clients that would rather read
+        // markdown than parse the HTML.
+        "md" => "text/markdown; charset=utf-8",
         "xml" => "application/xml",
         "map" => "application/json",
         _ => "application/octet-stream",
@@ -239,6 +294,69 @@ mod tests {
         assert!(site.serve("/index.html\0.js").is_none());
     }
 
+    /// One page, one URL: the bare path sends you to the slashed one.
+    #[test]
+    fn directory_without_slash_redirects() {
+        let (_d, site) = fixture();
+        let r = site
+            .canonical_redirect("/docs", None)
+            .expect("/docs should redirect to /docs/");
+        assert_eq!(r.status, 301);
+        assert!(r.body.is_empty());
+        assert_eq!(
+            r.headers
+                .iter()
+                .find(|(k, _)| k == "location")
+                .map(|(_, v)| v.as_str()),
+            Some("/docs/")
+        );
+    }
+
+    #[test]
+    fn redirect_keeps_the_query() {
+        let (_d, site) = fixture();
+        let r = site.canonical_redirect("/docs", Some("pretty=0")).unwrap();
+        assert_eq!(
+            r.headers
+                .iter()
+                .find(|(k, _)| k == "location")
+                .map(|(_, v)| v.as_str()),
+            Some("/docs/?pretty=0")
+        );
+    }
+
+    /// Everything that must *not* bounce: the canonical form itself, real
+    /// files, assets, and paths that go nowhere.
+    #[test]
+    fn nothing_else_redirects() {
+        let (_d, site) = fixture();
+        for path in [
+            "/docs/",
+            "/",
+            "/index.html",
+            "/404.html",
+            "/_next/static/chunks/a.js",
+            "/nope",
+            "/docs/missing",
+        ] {
+            assert!(
+                site.canonical_redirect(path, None).is_none(),
+                "should not redirect: {path}"
+            );
+        }
+    }
+
+    /// A Location assembled from the request line must not be able to inject a
+    /// second header.
+    #[test]
+    fn redirect_refuses_control_characters() {
+        let (_d, site) = fixture();
+        assert!(site.canonical_redirect("/docs\r\nX-Evil: 1", None).is_none());
+        assert!(site
+            .canonical_redirect("/docs", Some("a=1\r\nX-Evil: 1"))
+            .is_none());
+    }
+
     #[test]
     fn missing_file_is_none() {
         let (_d, site) = fixture();
@@ -271,6 +389,9 @@ mod tests {
         assert_eq!(content_type("js"), "text/javascript; charset=utf-8");
         assert_eq!(content_type("css"), "text/css; charset=utf-8");
         assert_eq!(content_type("woff2"), "font/woff2");
+        assert_eq!(content_type("txt"), "text/plain; charset=utf-8");
+        assert_eq!(content_type("xml"), "application/xml");
+        assert_eq!(content_type("md"), "text/markdown; charset=utf-8");
         assert_eq!(content_type("weird"), "application/octet-stream");
     }
 
