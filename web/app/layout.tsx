@@ -5,14 +5,14 @@ import { dmMono, dmSans, display } from "./fonts";
 import "./globals.css";
 
 const DESCRIPTION =
-  "See the JA3, JA4 and Akamai HTTP/2 fingerprint your client sends, decoded field by field. Free, no signup, open API.";
+  "Free TLS fingerprint test. See the JA3, JA4 and Akamai HTTP/2 fingerprint your client sends, decoded field by field. No signup, open API.";
 
 export const metadata: Metadata = {
   // Makes the relative OG image path above resolve to an absolute URL, which
   // is the only form crawlers accept.
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "kittens: what your TLS handshake gives away",
+    default: "TLS Fingerprint Test: Check Your JA3, JA4 & HTTP/2 | kittens",
     // Every other page states its own subject and inherits the suffix.
     template: "%s · kittens.sh",
   },
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
-    title: "kittens: what your TLS handshake gives away",
+    title: "TLS Fingerprint Test: Check Your JA3, JA4 & HTTP/2 | kittens",
     description: DESCRIPTION,
     url: SITE_URL,
     siteName: SITE_NAME,
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "kittens: what your TLS handshake gives away",
+    title: "TLS Fingerprint Test: Check Your JA3, JA4 & HTTP/2 | kittens",
     description: DESCRIPTION,
     images: [OG_IMAGE],
   },
