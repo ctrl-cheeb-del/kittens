@@ -117,7 +117,7 @@ export function Explainer() {
       <div className="border-t border-line px-5 py-8">
         {/* The h1: the visual hero above is the visitor's own JA4, which only
             exists once JavaScript has run and differs for every reader. */}
-        <h1 className="h2 mb-4 max-w-[52ch]">What a TLS fingerprint is</h1>
+        <h1 className="h2 mb-4 max-w-[52ch]">What a TLS fingerprint is, and how to check yours</h1>
         <div className="mb-10 grid gap-x-10 gap-y-4 text-base text-muted-foreground lg:grid-cols-2">
           <p className="text-pretty">
             Before any HTTP request exists, before a single byte is encrypted,
